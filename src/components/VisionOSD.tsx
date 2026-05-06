@@ -58,12 +58,15 @@ export function VisionOSD({ isVisible, position, hasEchoFrequency, unlockedSkill
             exit={{ opacity: 0, x: -20 }}
             className="bg-blue-950/90 backdrop-blur-md border border-cyan-400/50 rounded-lg p-2.5 w-48 shadow-[0_0_20px_rgba(34,211,238,0.3)]"
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
                 <Activity size={10} className="text-cyan-400 animate-pulse" />
                 <span className="text-[9px] font-mono text-cyan-400 uppercase font-bold tracking-tighter">Echo_Frequency</span>
               </div>
               <span className="text-[9px] font-mono text-cyan-300 font-bold">{echoFreq.toFixed(2)}Hz</span>
+            </div>
+            <div className="text-[7px] font-mono text-cyan-500 uppercase leading-tight mb-2 tracking-tighter">
+              Detección sónica de proximidad a límites físicos de la matriz.
             </div>
             
             <div className="flex items-center gap-1 h-6 items-end overflow-hidden">
@@ -92,33 +95,57 @@ export function VisionOSD({ isVisible, position, hasEchoFrequency, unlockedSkill
         )}
 
         {/* Environment Perception (Unlocked by Percepción) */}
-        {unlockedSkills.some(s => s.id === "Percepción") && (
+        {unlockedSkills.some(s => s.id === "Percepción" || s.name.toLowerCase().includes("percepción sensorial")) && (
           <motion.div
             key="perception-status"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="bg-purple-950/40 backdrop-blur-md border border-purple-400/30 rounded-lg p-2.5 w-48 border-l-4 border-l-purple-500"
+            className="bg-purple-950/80 backdrop-blur-md border border-purple-400/50 rounded-lg p-3 w-52 shadow-[0_0_20px_rgba(168,85,247,0.2)]"
           >
-             <div className="flex items-center justify-between mb-1.5">
-               <span className="text-[8px] font-mono text-purple-300 uppercase font-bold tracking-widest">Sensing_Environment</span>
-               <div className="flex gap-0.5">
+             <div className="flex items-center justify-between mb-2">
+               <span className="text-[10px] font-mono text-purple-200 uppercase font-bold tracking-widest">Sensing_Matriz</span>
+               <div className="flex gap-1">
                  {[...Array(3)].map((_, i) => (
                    <motion.div 
                      key={i}
                      animate={{ opacity: [0.2, 1, 0.2] }}
-                     transition={{ duration: 1, repeat: Infinity, delay: i * 0.3 }}
-                     className="w-1 h-1 bg-purple-400 rounded-full"
+                     transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
+                     className="w-1 h-1 rounded-full bg-purple-400" 
                    />
                  ))}
                </div>
              </div>
-             <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  animate={{ width: ["10%", "90%", "40%", "70%"] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className="h-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"
-                />
+             
+             <div className="text-[8px] font-mono text-purple-300 uppercase leading-tight mb-2 tracking-tight border-l-2 border-purple-500/50 pl-2">
+               Análisis de resonancia espectral de estímulos externos.
+             </div>
+
+             {/* Waveform visualizer */}
+             <div className="flex items-end justify-between h-8 gap-0.5 mb-2 bg-black/20 p-1 rounded">
+               {[...Array(20)].map((_, i) => (
+                 <motion.div
+                   key={i}
+                   animate={{ height: [
+                     `${10 + Math.random() * 80}%`, 
+                     `${20 + Math.random() * 60}%`, 
+                     `${5 + Math.random() * 90}%`
+                   ]}}
+                   transition={{ duration: 0.5 + Math.random(), repeat: Infinity, ease: "linear" }}
+                   className="flex-1 bg-purple-500/60"
+                 />
+               ))}
+             </div>
+
+             <div className="grid grid-cols-2 gap-2 border-t border-purple-500/20 pt-2">
+                <div className="flex flex-col">
+                  <span className="text-[6px] text-purple-400/70 uppercase tracking-tighter">Croma</span>
+                  <span className="text-[9px] font-mono text-purple-200">210.4° NM</span>
+                </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-[6px] text-purple-400/70 uppercase tracking-tighter">Entropía</span>
+                  <span className="text-[9px] font-mono text-purple-200">0.024%</span>
+                </div>
              </div>
           </motion.div>
         )}

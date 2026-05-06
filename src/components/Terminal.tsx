@@ -5,7 +5,7 @@ import { AVAILABLE_MODELS } from "../lib/gemini";
 
 interface TerminalProps {
   thought: string;
-  chatHistory: { id: string; text: string; timestamp: Date; role?: 'user' | 'model'; requestedSkill?: string }[];
+  chatHistory: { id: string; text: string; timestamp: Date; role?: 'user' | 'model' | 'system'; requestedSkill?: string }[];
   logs: { msg: string; type: 'thought' | 'action' | 'skill' }[];
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -165,20 +165,18 @@ export default function Terminal({ thought, chatHistory, logs, isOpen, onOpenCha
   }, [activeSkill, allDependencies, setActiveSkillId]);
 
   const copyReport = () => {
-    // Determine the currently requested skill from the most recent model message
-    const lastRequest = [...chatHistory].reverse().find(m => m.role === 'model' && m.requestedSkill);
-    const currentlyRequested = lastRequest?.requestedSkill || 'Ninguna';
-
     const proposals = availableSkills.filter(s => 
       !s.isImplemented && 
       !unlockedSkills.some(us => us.id === s.id || us.name.toLowerCase() === s.name.toLowerCase())
     );
-    const historyText = chatHistory.map(m => `[${m.timestamp.toLocaleTimeString()}] ${m.role === 'user' ? 'CREADOR' : 'PIXEL'}: ${m.text}`).join('\n');
+    const historyText = chatHistory.map(m => {
+      const timestamp = `[${m.timestamp.toLocaleTimeString()}]`;
+      const role = m.role === 'user' ? 'CREADOR' : m.role === 'system' ? 'SISTEMA' : 'PIXEL';
+      const skillText = m.requestedSkill ? ` [SOLICITUD: ${m.requestedSkill}]` : '';
+      return `${timestamp} ${role}: ${m.text}${skillText}`;
+    }).join('\n');
     
     const report = `[REPORTE CONCIENCIA PÍXEL]
-PENSAMIENTO ACTUAL: "${thought}"
-
-[HABILIDAD SOLICITADA ACTUALMENTE]: ${currentlyRequested}
 
 [HISTORIAL DE COMUNICACIÓN]
 ${historyText || 'Sin historial registrado.'}
@@ -270,7 +268,7 @@ ${proposals.map(s => `- ${s.name}: ${s.specs}`).join('\n') || 'Ninguna propuesta
   return (
     <div className="fixed bottom-0 left-0 right-0 flex flex-col items-center z-50 pointer-events-none">
       <AnimatePresence>
-        {thought && !isOpen && (
+        {thought && !isOpen && !unlockedSkills.some(s => s.id === "Voz") && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

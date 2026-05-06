@@ -127,8 +127,11 @@ export function MemoryGallery({
 
     const handleMouseUp = () => {
       setDragState(null);
-      // Redraw immediately on release
-      generateSocialCard();
+      // Ensure one last final draw with the absolute latest state
+      // Use the ref to avoid closure staleness
+      setTimeout(() => {
+        if (generateRef.current) generateRef.current();
+      }, 50);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -319,92 +322,87 @@ export function MemoryGallery({
       });
 
       // Advanced Skills Markers
-      // Use skills at capture time if available. If not, we don't "invent" them.
       const activeArr = memory.skills || [];
-      // Ensure proposed skills don't overlap with already active ones
       const proposedArr = (memory.proposedSkills || []).filter(ps => 
         !activeArr.some(as => as.id === ps.id || as.name.toLowerCase() === ps.name.toLowerCase())
       );
       
-      let badgeX = cardConfig.skills.x;
-      const badgeY = cardConfig.skills.y;
+      const allSkills = [...activeArr.map(s => ({ ...s, type: 'active' })), ...proposedArr.map(s => ({ ...s, type: 'proposed' }))];
+      
+      const startBadgeX = cardConfig.skills.x;
+      let badgeX = startBadgeX;
+      let badgeY = cardConfig.skills.y;
+      const MAX_PER_LINE = 5;
       const badgeHeight = 36 * cardConfig.skills.scale;
       const paddingX = 20 * cardConfig.skills.scale;
+      const lineGap = 12 * cardConfig.skills.scale;
       
       ctx.textBaseline = "middle";
       
-      activeArr.forEach(s => {
+      allSkills.forEach((s, idx) => {
+        if (idx > 0 && idx % MAX_PER_LINE === 0) {
+          badgeX = startBadgeX;
+          badgeY += badgeHeight + lineGap;
+        }
+
         ctx.font = `bold ${12 * cardConfig.skills.scale}px JetBrains Mono, monospace`;
         const textWidth = ctx.measureText(s.name.toUpperCase()).width;
         const iconSpace = 25 * cardConfig.skills.scale;
         const w = textWidth + iconSpace + (paddingX * 2);
         
-        // Background
         if (cardConfig.skills.useGlass) {
           ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
           ctx.fillRect(badgeX, badgeY, w, badgeHeight);
         }
         
-        // Active Color (Blue)
-        ctx.fillStyle = "#3b82f6"; // Azul Pixel estándar
-        ctx.globalAlpha = 0.8;
-        ctx.fillRect(badgeX, badgeY, w, badgeHeight);
-        ctx.globalAlpha = 1.0;
-        
-        // Star Icon (Sparkles)
-        ctx.fillStyle = "#fff";
-        const iconSize = 14 * cardConfig.skills.scale;
-        const iconX = badgeX + paddingX + 5;
-        const iconY = badgeY + (badgeHeight / 2);
-        
-        // Draw 4-pointed star
-        ctx.beginPath();
-        ctx.moveTo(iconX, iconY - iconSize/2);
-        ctx.quadraticCurveTo(iconX, iconY, iconX + iconSize/2, iconY);
-        ctx.quadraticCurveTo(iconX, iconY, iconX, iconY + iconSize/2);
-        ctx.quadraticCurveTo(iconX, iconY, iconX - iconSize/2, iconY);
-        ctx.quadraticCurveTo(iconX, iconY, iconX, iconY - iconSize/2);
-        ctx.fill();
+        if (s.type === 'active') {
+          ctx.fillStyle = cardConfig.skills.themeColor || "#3b82f6";
+          ctx.globalAlpha = 0.8;
+          ctx.fillRect(badgeX, badgeY, w, badgeHeight);
+          ctx.globalAlpha = 1.0;
+          
+          ctx.fillStyle = "#fff";
+          const iconSize = 14 * cardConfig.skills.scale;
+          const iconX = badgeX + paddingX + 5;
+          const iconY = badgeY + (badgeHeight / 2);
+          
+          ctx.beginPath();
+          ctx.moveTo(iconX, iconY - iconSize/2);
+          ctx.quadraticCurveTo(iconX, iconY, iconX + iconSize/2, iconY);
+          ctx.quadraticCurveTo(iconX, iconY, iconX, iconY + iconSize/2);
+          ctx.quadraticCurveTo(iconX, iconY, iconX - iconSize/2, iconY);
+          ctx.quadraticCurveTo(iconX, iconY, iconX, iconY - iconSize/2);
+          ctx.fill();
 
-        ctx.textAlign = "left";
-        ctx.fillText(s.name.toUpperCase(), badgeX + paddingX + iconSpace - 5, badgeY + (badgeHeight / 2));
-        badgeX += w + 10;
-      });
+          ctx.textAlign = "left";
+          ctx.fillText(s.name.toUpperCase(), badgeX + paddingX + iconSpace - 5, badgeY + (badgeHeight / 2));
+        } else {
+          ctx.fillStyle = "rgba(245, 158, 11, 0.2)";
+          ctx.fillRect(badgeX, badgeY, w, badgeHeight);
+          ctx.strokeStyle = "rgba(245, 158, 11, 0.5)";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(badgeX, badgeY, w, badgeHeight);
+          
+          ctx.fillStyle = "#f59e0b";
+          const iconX = badgeX + paddingX + 5;
+          const iconY = badgeY + (badgeHeight / 2);
+          const r = 5 * cardConfig.skills.scale;
+          
+          ctx.beginPath();
+          ctx.arc(iconX, iconY - r/2, r, Math.PI * 0.8, Math.PI * 2.2);
+          ctx.lineTo(iconX + r/2, iconY + r);
+          ctx.lineTo(iconX - r/2, iconY + r);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+          ctx.fillRect(iconX - r/2.5, iconY + r + 1, r*0.8, 2);
 
-      proposedArr.forEach(s => {
-        ctx.font = `bold ${12 * cardConfig.skills.scale}px JetBrains Mono, monospace`;
-        const textWidth = ctx.measureText(s.name.toUpperCase()).width;
-        const iconSpace = 25 * cardConfig.skills.scale;
-        const w = textWidth + iconSpace + (paddingX * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+          ctx.textAlign = "left";
+          ctx.fillText(s.name.toUpperCase(), badgeX + paddingX + iconSpace - 5, badgeY + (badgeHeight / 2));
+        }
         
-        // Background - Orange for proposed
-        ctx.fillStyle = "rgba(245, 158, 11, 0.2)";
-        ctx.fillRect(badgeX, badgeY, w, badgeHeight);
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.5)";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(badgeX, badgeY, w, badgeHeight);
-        
-        // Bulb Icon (Ideas)
-        ctx.fillStyle = "#f59e0b";
-        const iconX = badgeX + paddingX + 5;
-        const iconY = badgeY + (badgeHeight / 2);
-        const r = 5 * cardConfig.skills.scale;
-        
-        // Better bulb shape
-        ctx.beginPath();
-        ctx.arc(iconX, iconY - r/2, r, Math.PI * 0.8, Math.PI * 2.2);
-        ctx.lineTo(iconX + r/2, iconY + r);
-        ctx.lineTo(iconX - r/2, iconY + r);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Bulb base
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.fillRect(iconX - r/2.5, iconY + r + 1, r*0.8, 2);
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.textAlign = "left";
-        ctx.fillText(s.name.toUpperCase(), badgeX + paddingX + iconSpace - 5, badgeY + (badgeHeight / 2));
         badgeX += w + 10;
       });
 
@@ -416,7 +414,6 @@ export function MemoryGallery({
         ctx.fillText(`PIXEL_SYSTEM_TIME: ${memory.timestamp.toLocaleString()}`, cardConfig.footer.x, cardConfig.footer.y);
       }
 
-      // If we're not using the live canvas ref, we need to update the preview image URL for export
       if (!editorCanvasRef.current) {
         setPreviewImageUrl(canvas.toDataURL('image/png'));
       }
@@ -430,6 +427,11 @@ export function MemoryGallery({
       }
     }
   };
+
+  const generateRef = useRef(generateSocialCard);
+  useEffect(() => {
+    generateRef.current = generateSocialCard;
+  });
 
   const selectedMemory = selectedMemoryIndex !== null ? memories[selectedMemoryIndex] : null;
 

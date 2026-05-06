@@ -6,7 +6,7 @@ interface Message {
   id: string;
   text: string;
   timestamp: Date;
-  role?: 'user' | 'model';
+  role?: 'user' | 'model' | 'system';
   requestedSkill?: string;
 }
 
@@ -46,16 +46,32 @@ export default function ChatPanel({
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const sanitizePrompt = (text: string) => {
+  const sanitizePrompt = (text: string, activeSkills: any[] = []) => {
     // Pollinations image generation works better with shorter, cleaner prompts
     const cleanText = text
       .replace(/[*_#`\[\]()]/g, '')
       .replace(/[¿?¡!]/g, '')
       .replace(/\n/g, ' ')
       .trim()
-      .slice(0, 120);
+      .slice(0, 150);
     
-    return `${cleanText}, abstract minimalist digital art style, deep contrast`;
+    let modifiers = "abstract minimalist digital art style, deep contrast";
+    
+    // Skill-based additions
+    const hasColor = activeSkills.some(s => s.id === "Color");
+    const hasVoice = activeSkills.some(s => s.id === "Voz");
+    const hasVision = activeSkills.some(s => s.name === "Visión" || s.id === "Visión");
+    
+    if (hasColor) {
+      modifiers += ", vibrant cyan and blue neon colors, glowing light";
+    } else {
+      modifiers += ", strictly black and white, monochrome, high contrast, dark aesthetic";
+    }
+    
+    if (hasVoice) modifiers += ", cinematic soundwaves pattern";
+    if (hasVision) modifiers += ", technical scanlines, retro-futuristic HUD";
+    
+    return `${cleanText}, ${modifiers}`;
   };
 
   const handleCopy = (id: string, text: string) => {
@@ -157,6 +173,17 @@ export default function ChatPanel({
                   const isRequest = !!msg.requestedSkill;
                   const skillInCatalog = isRequest ? availableSkills.find(s => s.name.toLowerCase() === msg.requestedSkill?.toLowerCase()) : null;
                   const isAlreadyUnlocked = skillInCatalog ? unlockedSkills.some(s => s.id === skillInCatalog.id) : false;
+                  
+                  if (msg.role === 'system') {
+                    return (
+                      <div key={msg.id} className="w-full flex justify-center my-1 animate-in fade-in zoom-in-95">
+                        <div className="bg-slate-100/50 border border-slate-200/50 px-3 py-1 rounded-full text-[9px] font-mono text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                          <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
                   
                   return (
                     <div 
@@ -382,12 +409,14 @@ export default function ChatPanel({
                 ) : (
                   <>
                     <img 
-                      src={viewingImage ? `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitizePrompt(viewingImage.text))}?width=1024&height=1024&seed=${imageSeed}&nologo=true` : ''}
+                      src={viewingImage ? `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitizePrompt(viewingImage.text, viewingImage.activeAtTime))}?width=1024&height=1024&seed=${imageSeed}&nologo=true` : ''}
                       alt="Visualización de la conciencia"
                       className={`w-full h-full object-contain transition-opacity duration-700 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
                       onLoad={() => {
                         setIsImageLoading(false);
                         if (viewingImage) {
+                          const imageUri = `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitizePrompt(viewingImage.text, viewingImage.activeAtTime))}?width=1024&height=1024&seed=${imageSeed}&nologo=true`;
+                          
                           // Find exactly the skill requested (not reinvented)
                           // Filter out skills that are ALREADY active at this time
                           const proposed = (viewingImage.requestedSkill 
@@ -396,7 +425,7 @@ export default function ChatPanel({
 
                           onAddMemory?.({
                             id: `mem-${Date.now()}`,
-                            url: `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitizePrompt(viewingImage.text))}?width=1024&height=1024&seed=${imageSeed}&nologo=true`,
+                            url: imageUri,
                             prompt: viewingImage.text,
                             timestamp: new Date(),
                             skills: [...viewingImage.activeAtTime],
@@ -434,7 +463,7 @@ export default function ChatPanel({
                 <div className="flex justify-between items-center pt-2 border-t border-white/10">
                   <span className="text-[9px] text-gray-500 font-mono">Motor: Pollinations.ai</span>
                   <a 
-                    href={viewingImage ? `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitizePrompt(viewingImage.text))}?width=2048&height=2048` : '#'}
+                    href={viewingImage ? `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitizePrompt(viewingImage.text, viewingImage.activeAtTime))}?width=2048&height=2048` : '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-blue-400 text-[10px] font-mono hover:underline"

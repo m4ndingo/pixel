@@ -61,7 +61,7 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [activeModel, setActiveModel] = useState<string>("ESPERANDO...");
   const [isGlobalPerspective, setIsGlobalPerspective] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{ id: string; text: string; role?: 'user' | 'model'; timestamp: Date; requestedSkill?: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ id: string; text: string; role?: 'user' | 'model' | 'system'; timestamp: Date; requestedSkill?: string }[]>([]);
   const [fps, setFps] = useState(60);
   const [isPaused, setIsPaused] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<string | null>(null);
@@ -171,7 +171,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [isThinking]);
 
-  const addToChatHistory = (text: string, role: 'user' | 'model' = 'model', requestedSkill?: string) => {
+  const addToChatHistory = (text: string, role: 'user' | 'model' | 'system' = 'model', requestedSkill?: string) => {
     setChatHistory(prev => {
       // Auto-detection of skills in text if not explicitly provided
       let detectedSkill = requestedSkill;
@@ -478,10 +478,14 @@ export default function App() {
     setUnlockedSkills(newUnlocked);
     
     if (!skill.isImplemented) {
-      addLog(`PROTOCOLO EXPERIMENTAL CARGADO: '${skill.name}' reside ahora en memoria volátil.`, 'action');
+      const msg = `Protocolo experimental cargado: '${skill.name}'.`;
+      addLog(`SISTEMA: ${msg}`, 'action');
+      addToChatHistory(msg, 'system');
       addLog(`Nota: Este protocolo de I+D no tiene efectos motrices directos todavía.`, 'thought');
     } else {
-      addLog(`Protocolo '${skill.name}' activado con éxito.`, 'skill');
+      const msg = `Protocolo '${skill.name}' activado con éxito.`;
+      addLog(`SISTEMA: ${msg}`, 'skill');
+      addToChatHistory(msg, 'system');
     }
     
     // NPC reacts to new skill ONLY if auto mode is ON
@@ -545,19 +549,20 @@ export default function App() {
       const availableIdx = availableSkills.findIndex(s => s.name.toLowerCase() === sName.toLowerCase());
 
       if (unlockedIdx === -1) {
+        const cleanedName = sName.trim();
         if (availableIdx === -1) {
           // New skill proposed
-          const newSkill: Skill = { id: sName, name: sName, specs: sSpecs || "Mete-datos no definidos", isImplemented: false };
+          const newSkill: Skill = { id: cleanedName, name: cleanedName, specs: sSpecs || "Mete-datos no definidos", isImplemented: false };
           setAvailableSkills(prev => {
-            if (prev.some(s => s.id === sName || s.name.toLowerCase() === sName.toLowerCase())) return prev;
+            if (prev.some(s => s.id === cleanedName || s.name.toLowerCase() === cleanedName.toLowerCase())) return prev;
             return [...prev, newSkill];
           });
-          addLog(`NUEVO PROTOCOLO CONCEPTUAL: [${sName}]`, 'skill');
-          addToChatHistory(data.thought, 'model', sName);
+          addLog(`NUEVO PROTOCOLO CONCEPTUAL: [${cleanedName}]`, 'skill');
+          addToChatHistory(data.thought, 'model', cleanedName);
         } else {
           // Existing skill requested but not active
-          addLog(`PIXEL SOLICITA ACTIVACIÓN: [${sName}]`, 'skill');
-          addToChatHistory(data.thought, 'model', sName);
+          addLog(`PIXEL SOLICITA ACTIVACIÓN: [${cleanedName}]`, 'skill');
+          addToChatHistory(data.thought, 'model', cleanedName);
         }
       } else {
         // Requested something already unlocked, just the thought
@@ -686,6 +691,7 @@ export default function App() {
       if (s.id === "Visión") impact = 10;
       if (s.id === "Mitosis") impact = 35;
       if (s.id === "Bifurcación de Nodo") impact = 20;
+      if (s.id === "Alteración Topológica Local") impact = 15;
       
       skillLoad += impact;
       return { name: s.name, impact };
@@ -693,23 +699,35 @@ export default function App() {
 
     const totalSaturation = coreLoad + skillLoad;
     const recommendedAction = totalSaturation > 80 
-      ? "Saturación crítica. Se recomienda desactivar protocolos de renderizado persistente (Rastro/Solidificación)."
-      : totalSaturation > 50 
-        ? "Carga moderada. Estabilidad garantizada en ciclos estándar."
-        : "Sistema optimizado.";
+      ? "Saturación crítica detectada. Se recomienda desactivar protocolos de renderizado persistente (Rastro/Solidificación/Alteración)."
+      : totalSaturation > 60 
+        ? "Carga elevada. El rendimiento puede fluctuar según el hardware local."
+        : totalSaturation > 40
+          ? "Carga moderada. Estabilidad garantizada en ciclos estándar."
+          : "Sistema optimizado.";
 
-    const proposals = availableSkills.filter(s => 
-      !unlockedSkills.some(u => u.name.toLowerCase() === s.name.toLowerCase())
-    );
+    const historyText = chatHistory.map(m => {
+      const timestamp = `[${m.timestamp.toISOString()}]`;
+      let roleDisplay = m.role === 'user' ? 'CREADOR' : m.role === 'system' ? 'SISTEMA' : 'PIXEL';
+      const skillText = m.requestedSkill ? ` [SOLICITUD: ${m.requestedSkill}]` : '';
+      return `${timestamp} ${roleDisplay}: ${m.text}${skillText}`;
+    }).join('\n');
 
-    const lastRequest = [...chatHistory].reverse().find(m => m.role === 'model' && m.requestedSkill);
-    const currentlyRequested = lastRequest?.requestedSkill || 'Ninguna';
+    const requestableProposals = availableSkills.filter(s => {
+      if (unlockedSkills.some(us => us.id === s.id || us.name.toLowerCase() === s.name.toLowerCase())) return false;
+      if (!s.dependsOn || s.dependsOn.length === 0) return true;
+      return s.dependsOn.every(depId => 
+        unlockedSkills.some(us => us.id === depId || us.name.toLowerCase() === depId.toLowerCase())
+      );
+    });
 
     const report = `[INFORME DE DIAGNÓSTICO DE CONCIENCIA]
 FECHA: ${new Date().toISOString()}
 FPS ACTUAL: ${fps}
-ESTADO: PAUSADO PARA ANÁLISIS
-SOLICITUD ACTUAL: ${currentlyRequested}
+ESTADO: ${isPaused ? 'PAUSADO PARA ANÁLISIS' : 'ACTIVO'}
+
+[HISTORIAL DE COMUNICACIÓN]
+${historyText || 'Sin historial registrado.'}
 
 PROTOCOLOS ACTIVOS:
 - Núcleo Base: ${coreLoad}%
@@ -718,8 +736,11 @@ ${impactList.sort((a,b) => b.impact - a.impact).map(s => `- ${s.name}: ${s.impac
 SATURACIÓN TOTAL: ${totalSaturation}%
 ESTADO DE MEMORIA: ${unlockedSkills.length} subrutinas activas.
 
-PROPUESTAS DE PÍXEL (CATÁLOGO INACTIVO):
-${proposals.length > 0 ? proposals.map(p => `- ${p.name}: ${p.specs}`).join("\n") : "Ninguna propuesta pendiente."}
+PRÓXIMOS PROTOCOLOS DISPONIBLES (MÁS RELEVANTES):
+${requestableProposals.length > 0 
+  ? requestableProposals.slice(0, 3).map(p => `- ${p.name}: ${p.specs}`).join("\n") 
+  : "Ninguno disponible actualmente (requisitos de núcleo no cumplidos)."}
+${requestableProposals.length > 3 ? `... y ${requestableProposals.length - 3} más disponibles en el catálogo.` : ""}
 
 RECOMENDACIÓN TÉCNICA:
 ${recommendedAction}
@@ -808,6 +829,7 @@ FIN DEL REPORTE`;
           isGlobalPerspective={isGlobalPerspective} 
           fps={fps}
           isPaused={isPaused}
+          thought={thought}
         />
       </motion.div>
 

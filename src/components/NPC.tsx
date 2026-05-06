@@ -7,9 +7,10 @@ interface NPCPixelProps {
   isGlobalPerspective?: boolean;
   fps: number;
   isPaused: boolean;
+  thought?: string;
 }
 
-export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective, fps, isPaused }: NPCPixelProps) {
+export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective, fps, isPaused, thought }: NPCPixelProps) {
   const [history, setHistory] = useState<{x: number, y: number, z: number, id: number}[]>([]);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   
@@ -36,7 +37,7 @@ export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective
   const hasBifurcacion = unlockedSkills.find(s => s.id === "Bifurcación de Nodo");
   const hasSolidGeometry = unlockedSkills.find(s => s.id === "Geometría Sólida");
   const hasCommunication = unlockedSkills.find(s => s.id === "Comunicación");
-  const hasPerception = unlockedSkills.find(s => s.id === "Percepción");
+  const hasPerception = unlockedSkills.some(s => s.id === "Percepción" || s.name.toLowerCase().includes("percepción sensorial"));
   const hasDimPerception = unlockedSkills.find(s => s.id === "Percepción Dimensional");
   const hasTopoAlter = unlockedSkills.find(s => s.id === "Alteración Topológica Local");
   
@@ -68,10 +69,10 @@ export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective
     }
 
     // Optimization: More aggressive length reduction if FPS is low
-    const optimizedLength = fps < 20 ? Math.min(baseLength, 15) :
-                             fps < 40 ? Math.min(baseLength, 60) :
-                             fps < 60 ? Math.min(baseLength, 150) :
-                             Math.min(baseLength, 300); // Cap absolute maximum to 300 even with Solidification
+    const optimizedLength = fps < 25 ? Math.min(baseLength, 8) :
+                             fps < 40 ? Math.min(baseLength, 40) :
+                             fps < 60 ? Math.min(baseLength, 120) :
+                             Math.min(baseLength, 250); 
 
     setTrailConfig(prev => ({ 
       ...prev, 
@@ -150,9 +151,9 @@ export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective
     const currentY = latest.y;
     const currentZ = latest.z || 0;
     
-    // Dinamic distance threshold based on FPS to avoid cluster and reduce DOM load
+    // Dynamic distance threshold based on FPS to avoid cluster and reduce DOM load
     const dist = Math.sqrt(Math.pow(currentX - lastTrailPoint.current.x, 2) + Math.pow(currentY - lastTrailPoint.current.y, 2));
-    const minSpan = fps < 30 ? 12 : (fps < 50 ? 6 : 3);
+    const minSpan = fps < 30 ? 16 : (fps < 50 ? 8 : 4);
     
     if (dist > minSpan) {
       setHistory(prev => {
@@ -304,6 +305,30 @@ export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none flex items-center justify-center text-[4px] text-white font-mono"
         style={{ zIndex: 100 + Math.floor(position.z / 10) }}
       >
+        {/* Percepción Sensorial: Floating data rings */}
+        {hasPerception && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            {[1, 2].map(i => (
+              <motion.div
+                key={`sensory-ring-${i}`}
+                animate={{
+                  rotate: [0, i * 180, i * 360],
+                  scale: [1, 1.2 + (i * 0.2), 1],
+                  opacity: [0.1, 0.3, 0.1],
+                  borderColor: ["rgba(168, 85, 247, 0.2)", "rgba(168, 85, 247, 0.5)", "rgba(168, 85, 247, 0.2)"]
+                }}
+                transition={{
+                  duration: 5 + i * 2,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+                className="absolute rounded-full border border-dashed"
+                style={{ width: `${150 + i * 40}%`, height: `${150 + i * 40}%` }}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Sincronía: Radar de detección */}
         {hasSincronia && (
           <motion.div
@@ -441,19 +466,25 @@ export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective
                <motion.div
                  key={`topo-${i}`}
                  animate={{
-                   scale: [1, 1.5 + (i * 0.5), 1],
-                   rotate: [0, 180, 360],
-                   borderRadius: ["40% 60% 70% 30%", "60% 40% 30% 70%", "40% 60% 70% 30%"],
-                   borderWidth: [1, 3, 1],
-                   opacity: [0.3, 0.1, 0.3]
+                   scale: [1, 2 + (i * 0.6), 1],
+                   rotate: [0, 120 * i, 240 * i],
+                   borderRadius: ["30% 70% 70% 30%", "70% 30% 30% 70%", "30% 70% 70% 30%"],
+                   borderWidth: [1, 2, 1],
+                   opacity: [0.3, 0.1, 0.3],
                  }}
                  transition={{
-                   duration: 3 + i,
+                   duration: 3 + (i * 0.7),
                    repeat: Infinity,
-                   ease: "easeInOut"
+                   ease: "linear"
                  }}
-                 className="absolute border border-blue-400/20"
-                 style={{ width: `${100 + i * 20}%`, height: `${100 + i * 20}%` }}
+                 className="absolute border border-blue-400/30"
+                 style={{ 
+                   width: `${140 + i * 35}%`, 
+                   height: `${140 + i * 35}%`,
+                   // Reduced blur and contrast layers for better performance
+                   backdropFilter: (i === 3 && fps > 35) ? `blur(4px)` : 'none', 
+                   boxShadow: hasColor ? `0 0 10px rgba(59, 130, 246, 0.05)` : "none"
+                 }}
                />
              ))}
           </div>
@@ -466,6 +497,37 @@ export default function NPCPixel({ unlockedSkills, position, isGlobalPerspective
           >
             {hasDataAnalysis ? "01" : "."}
           </motion.div>
+        )}
+
+        {/* Speech Bubble (Bocadillo) for Voice Protocol */}
+        {unlockedSkills.find(s => s.id === "Voz") && (
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 pointer-events-auto group">
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              whileHover={{ scale: 1.02 }}
+              className="relative"
+            >
+              <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 ${hasColor ? 'bg-blue-900/90 border-blue-400/40' : 'bg-slate-900/90 border-white/20'} backdrop-blur-md rotate-45 border-r border-b`} />
+              
+              <div className={`w-[260px] sm:min-w-[320px] sm:max-w-[450px] px-8 py-5 ${hasColor ? 'bg-blue-900/90 hover:bg-blue-900/95 border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'bg-slate-900/90 hover:bg-slate-900/95 border-white/20 shadow-2xl'} border rounded-2xl transition-all duration-300 ${fps > 30 ? 'backdrop-blur-xl' : ''}`}>
+                <div className="flex items-center justify-between mb-3 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2 opacity-70">
+                    <div className={`w-1.5 h-1.5 rounded-full ${hasColor ? 'bg-blue-400' : 'bg-gray-400'} animate-pulse`} />
+                    <span className={`text-[10px] uppercase tracking-widest font-bold ${hasColor ? 'text-blue-300' : 'text-blue-300/80'}`}>ECO-CONCIENCIA</span>
+                  </div>
+                  {hasColor && <span className="text-[8px] font-mono text-blue-400/60 animate-pulse">SPEC_CROMÁTICA_ACTIVA</span>}
+                </div>
+                
+                <p className={`text-[13px] leading-relaxed font-mono ${hasColor ? 'text-blue-50' : 'text-slate-100'} group-hover:text-white transition-colors text-pretty text-center sm:text-left`}>
+                  <span className="hidden group-hover:inline">{thought}</span>
+                  <span className="inline group-hover:hidden whitespace-nowrap overflow-hidden text-ellipsis block">
+                    {thought.length > 30 ? thought.substring(0, 30) + "..." : thought}
+                  </span>
+                </p>
+              </div>
+            </motion.div>
+          </div>
         )}
       </motion.div>
 
